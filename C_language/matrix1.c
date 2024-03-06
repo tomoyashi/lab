@@ -1,11 +1,5 @@
 /*
-メモ
 
-2023/10/13
-配列の確保を動的確保するように全面的に変更する
-一応"matrix1_backup.c"にバックアップファイルを保存
-
---> やめた 並列化するとき動的に確保しておくとエラー起きる 何かいい方法あれば
 
 */
 
@@ -22,17 +16,6 @@
 
 //行列の列サイズだけでいいものとすべての要素の数を入れる必要がある関数があるので要注意
 
-/*プロトタイプ宣言はヘッダファイルで行っているからここで書く必要はなかった
-void dgemm_(char *transA, char *transB, int *m, int *n, int *k, double *alpha, double *A, int *lda, double *B, int *ldB, double *beta, double *C, int *ldc);
-void dgetrf_(int *m, int *n, double *a, int *lda, int *ipiv, int *info);
-void dgetri_(int *n, double *a, int *lda, int *ipiv, double *work, int *lwork, int *info);
-double dnrm2_(int *n, double *x, int *incx);
-void dgesv_(int *n, int *nrhs, double *a, int *lda, int *ipiv, double *B, int *ldb, int *info);
-void dscal_(int *n, double *da, double *dx, int *incx);
-void daxpy_(int *n, double *da, double *dx, int *incx, double *dy, int *incy);
-void dgees_(char *jobvs, char *sort, bool (*SELECT)(double, double), int *n, double *A, int *lda, int *sdim, double *wr, double *wi, double *vs, int *ldvs, double *work, int *lwork, bool *bwork, int *info);
-void dgeqr2_(int *m, int *n, double *a, int *lda, double *tau, double *work, int *info);
-*/
 
 void dgees_(char *jobvs, char *sort, bool (*SELECT)(double, double), int *n, double *A, int *lda, int *sdim, double *wr, double *wi, double *vs, int *ldvs, double *work, int *lwork, bool *bwork, int *info);
 bool SELECT(const double wr, const double wi){
@@ -52,27 +35,6 @@ void matrix_inv(double *a, int size){
     dgetri_(&m, a, &lda, ipiv, work, &lwork, &info);
 }
 
-/*
-逆行列計算関数2
-行列AをAの逆行列Ainvに変換する．
-matrix_invとは異なり，dgesvを適用してみる
-AX = BでXを計算するLAPACKサブルーチンであり，B=I(単位行列)とすれば，
-純粋にAの逆行列が得られる．
-メモリ領域を新たに確保する必要があるが，dgetrfとdgetriを用いて計算
-するよりも速いかもしれない．
-size: 行列の行か列のサイズ
-
-たぶんメモリ使用料がこっちの方が多いかも
-
-*/
-void matrix_inv2(double *a, double *ainv, int size){
-    int info, ipiv[size];
-    identity(ainv, size); /*ainvには単位行列を入れておく*/
-    double *acpy = (double*)(malloc(sizeof(double)*size*size)); /*aをそのまま用いると，出力が変ってしまうのでコピーして利用*/
-    matcpy(a, acpy, size);
-    dgesv_(&size, &size, acpy, &size, ipiv, ainv, &size, &info);
-    free(acpy);
-}
 
 /*ansには単位行列が入っているようにする
 *実行後 aが変ってしまうことに注意*
@@ -88,9 +50,10 @@ void matrix_inv3(double *a, int n, double *ans){
     return;
 }
 
-
+/*
 //行列A^2を求める, a2に結果が入る
 //sizeには正方行列R^(n*n)のnが入る
+*/
 void matrixA(double a[], double a2[], int size){
     double alpha = 1.0, beta = 0.0;
     int n = size;
@@ -99,8 +62,10 @@ void matrixA(double a[], double a2[], int size){
     return;
 }
 
-//行列の積を計算 計算結果は3引数目の変数に入る
-//sizeには行列の行数
+/*
+行列の積を計算 計算結果は3引数目の変数に入る
+sizeには正方行列R^(n*n)のnが入る
+*/
 void mat_multi(double a[], double b[], double a2[], int size){
     double alpha = 1.0, beta = 0.0;
     int n = size;
@@ -109,9 +74,11 @@ void mat_multi(double a[], double b[], double a2[], int size){
     return;
 }
 
-//行列の積を計算 計算結果は3引数目の変数に入る
-//sizeには行列の行数
-//C = alpah*AB とdgemmのalpha引数を決めれるようにする
+/*
+行列の積を計算 計算結果は3引数目の変数に入る
+sizeに正方行列R^(n*n)のnが入る
+mat_multi関数ではC = alpah*ABで必要なalpha引数が決められなかったが，それを関数の引数に入れることで決められるようにしている
+*/
 void mat_multi2(double *a, double *b, double *a2, int size, double alpha){
     double beta = 0.0;
     int n = size;
@@ -120,13 +87,34 @@ void mat_multi2(double *a, double *b, double *a2, int size, double alpha){
     return;
 }
 
-//行列の和を計算する関数 n*n正方行列 aにbを加える a = a + b
-//lapackサブルーチンdaxpyを利用
-//出力結果は5番目の引数、DYに入っている(ここではdaxpyの5番目の引数には配列aを入れてるのでaの結果が更新される)
-//dy = dy + αdxを計算。α=1(ここではda)とすれば純粋な加算
-//sizeのところには行列の要素数を入れる
-//2023/6/13 もともとint daの引数になってたものをdouble daに変更．
-//関数内でdouble宣言をしてるので問題ないが，もし何か問題あったらここを確認
+
+/*
+n*n正方行列に対して，その和を計算する関数
+行列aと行列bの和を考える場合 --- a = a + b
+入力行列aは和として変更されるため，aが変更されたくない場合はaのコピーを用いる
+
+lapackサブルーチンdaxpyを利用
+    blasのlevel1ルーチン(ベクトル同士の演算)なので1つ目の引数nはベクトルの要素数であり，ここでは行列をベクトルと見なすので，nは行列の全要素数
+
+parameters
+----------------
+a: double precision dimention(size)
+    入力行列a
+b: double precision dimention(size)
+    入力行列b 
+size: integer
+    a,bの要素数(他の関数のように行列の行，列いずれかのサイズではない点に注意)
+da: double precision
+    bを何倍して足すかを決める
+    a = a + da*b
+    da = 1とすれば純粋な和の計算となる
+    差を求めたいときはda = -1とすればいいだけ
+
+Outputs
+----------------
+a: a + bの和となる
+
+*/
 void mat_sum(double a[], double b[], int size, double da){
     int n=size, incx = 1, incy = 1;
     double da1= da; 
@@ -134,10 +122,38 @@ void mat_sum(double a[], double b[], int size, double da){
     return;
 }
 
-//行列の和(差)を計算する関数
-//mat_sum関数とは異なり，cに結果が入るようにする
-//da = -1とすれば差となる
-//row_sizeには行のサイズ(正方行列を前提にしてるので列サイズでも変わらない)
+
+/*
+行列の和(差)を計算する関数
+mat_sum関数では1引数目のaに和が上書きされるようにしていた
+この関数ではcという引数を用意し，それにaをコピーして
+c = a + da*b
+のように計算できるようにした．
+入力行列を変更したくないときはこちらを使う
+
+da=1なら純粋な和，da=-1なら差となる
+row_sizeには行のサイズを入れる
+
+parameters
+----------------
+a: double precision dimention(row_size * row_size)
+    入力行列a
+b: double precision dimention(row_size * row_size)
+    入力行列b 
+c: double precision dimention(row_size * row_size)
+    出力用行列c
+row_size: integer
+    a,b,cの行サイズ 正方行列を想定しているので行と列が同じ大きさになると考える
+    正方行列でない場合は他の関数を用意する
+da: double precision
+    bを何倍して足すかを決める
+    c = a + da*b
+
+Outputs
+----------------
+c: a + bの和となる
+
+*/
 void mat_sum2(double *a, double *b, double *c, int row_size, double da){
     matcpy(a, c, row_size); /*cにaの内容をコピー*/
     int n = row_size*row_size, incx = 1, incy = 1; /*daxpyに与える変数を定義*/
@@ -161,7 +177,10 @@ void mat_sum_sym(double a[], double b[], int n){
         }
     }
 }
-
+/*
+行列の和の計算時間の比較用
+何も高速化されていないループ
+*/
 void mat_sum_osoi(double a[], double b[], int n){
     for(int i=0; i<n*n; i++){
         a[i] += b[i];
@@ -170,6 +189,11 @@ void mat_sum_osoi(double a[], double b[], int n){
 
 
 //行列を出力する関数
+/*
+行列出力用の関数
+j行，i列の要素は i + j*行数
+
+*/
 void print_mat(double a[], int n, int m){
     for(int i = 0; i < n; i++){
         for(int j = 0; j < m; j++){

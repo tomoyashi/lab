@@ -1,6 +1,6 @@
 C言語のプログラムがあります．  
 以下でプログラムの説明を行っていきます．
-[matrix1.*の内容](matrix1_doc.md)
+
 # プログラムファイルの説明
 ## matrix1.*
 ### matrix1ファイルの使い方
@@ -19,6 +19,7 @@ gcc main.c matrix1.c -llapack -lblas -lm
 基本的には，matrix1.c内で各関数の前にコメントアウトで内容が記載されています．
 
 以下によく使うファイルのみ詳細を記述します．
+[matrix1.*の内容](matrix1_doc.md)
 
 ## mytimer.*
 mytimer.cおよびmytimer.hは時間計測用のプログラムです．mpiを用いるときは``MPI_Wtime``関数でも時間を計測できますが、mpiを使わないときなどすべてで同じ形式で時間を計測したかったため作成しました．  

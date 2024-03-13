@@ -18,7 +18,7 @@ gcc main.c matrix1.c -llapack -lblas -lm
 ### matrix1内の関数についての説明
 基本的には，matrix1.c内で各関数の前にコメントアウトで内容が記載されています．
 
-以下によく使うファイルのみ詳細を記述します．
+以下によく使うファイルのみ詳細を記述します．  
 [matrix1.*の内容](matrix1_doc.md)
 
 ## mytimer.*

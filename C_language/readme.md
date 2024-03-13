@@ -1,6 +1,6 @@
 C言語のプログラムがあります．  
 以下でプログラムの説明を行っていきます．
-[matrix1.*の内容](C_language/matrix1_doc.md)
+[matrix1.*の内容](matrix1_doc.md)
 # プログラムファイルの説明
 ## matrix1.*
 ### matrix1ファイルの使い方
